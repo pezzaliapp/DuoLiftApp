@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DuoLiftApp 3D — Ponte 2 Colonne</title>
+  <title>DuoLiftApp 3D — Ponte 2 Colonne (No PWA)</title>
   <meta name="theme-color" content="#0b5fff"/>
-  <link rel="manifest" href="manifest.json"/>
   <link rel="icon" sizes="192x192" href="icons/icon-192.png"/>
   <style>
     :root{--bg:#0a0d14;--fg:#e5f0ff;--acc:#0b5fff}
@@ -14,12 +13,9 @@
     header{position:fixed;top:0;left:0;right:0;z-index:5;background:#0b5fff;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
     header h1{font-size:16px;margin:0;font-weight:700}
     .btn{border:0;border-radius:10px;padding:8px 12px;background:#101828;color:#fff;cursor:pointer}
-    .btn.primary{background:var(--acc)}
     #viewport{position:fixed;inset:56px 0 0 0}
     #hud{position:fixed;right:12px;top:64px;z-index:6;display:grid;gap:8px}
     .chip{background:#131b2e;border:1px solid rgba(255,255,255,.12);padding:8px 10px;border-radius:10px;font-size:12px}
-    #tray{position:fixed;left:12px;top:64px;z-index:6;display:flex;flex-direction:column;gap:8px}
-    .pill{padding:6px 10px;border-radius:999px;background:#0b1324;border:1px solid rgba(255,255,255,.12);font-size:12px}
     #intro{position:fixed;inset:0;background:linear-gradient(180deg,#020409,#0a0d14);display:flex;align-items:center;justify-content:center;z-index:10}
     .card{width:min(760px,92vw);border-radius:16px;background:#0e1628;color:#fff;box-shadow:0 20px 80px rgba(0,0,0,.45);padding:20px;border:1px solid rgba(255,255,255,.12)}
     .foot{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:12px}
@@ -29,10 +25,7 @@
 <body>
   <header>
     <h1>🛠️ DuoLiftApp 3D — Ponte 2 Colonne</h1>
-    <div style="display:flex;gap:8px">
-      <button id="btnReset" class="btn">↺ Reset</button>
-      <button id="btnInstall" class="btn primary" hidden>➕ Installa</button>
-    </div>
+    <button id="btnReset" class="btn">↺ Reset</button>
   </header>
 
   <div id="viewport"><canvas id="webgl"></canvas></div>
@@ -43,19 +36,14 @@
     <div class="chip">⭐ <span id="score">0</span></div>
   </div>
 
-  <div id="tray">
-    <div class="pill">🎮 Drag & Snap</div>
-    <div class="pill">Q/E: ruota pezzo</div>
-  </div>
-
   <div id="intro" role="dialog" aria-modal="true">
     <div class="card">
       <h2>DuoLiftApp 3D</h2>
       <p>Trascina i pezzi in 3D e componi il ponte: base → colonne → motore/centralina → bracci telescopici (3 per lato).<br/>Rotazione camera: trascina il vuoto • Zoom: rotellina • Pan: Alt/Option + drag.</p>
       <div class="foot">
-        <span>Three.js • PWA • Offline</span>
+        <span>Three.js • No Service Worker</span>
         <div style="display:flex;gap:8px">
-          <button id="startBtn" class="btn primary">Inizia</button>
+          <button id="startBtn" class="btn">Inizia</button>
           <a class="btn" href="readme.html" target="_blank" rel="noopener">Guida</a>
         </div>
       </div>
@@ -63,5 +51,6 @@
   </div>
 
   <script type="module" src="app3d.js"></script>
+  <script>/* No SW: niente cache, zero conflitti */</script>
 </body>
 </html>
