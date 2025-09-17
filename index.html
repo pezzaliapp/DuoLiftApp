@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DuoLiftApp 3D — Ponte 2 Colonne (No PWA)</title>
+  <title>DuoLiftApp 3D — Ponte 2 Colonne (Local Modules + SW killer)</title>
   <meta name="theme-color" content="#0b5fff"/>
   <link rel="icon" sizes="192x192" href="icons/icon-192.png"/>
   <style>
@@ -20,6 +20,7 @@
     .card{width:min(760px,92vw);border-radius:16px;background:#0e1628;color:#fff;box-shadow:0 20px 80px rgba(0,0,0,.45);padding:20px;border:1px solid rgba(255,255,255,.12)}
     .foot{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:12px}
     a{color:#78aaff}
+    #err{position:fixed;left:50%;top:56px;transform:translateX(-50%);background:#5f1212;color:#fff;padding:10px 14px;border-radius:10px;display:none;z-index:7}
   </style>
 </head>
 <body>
@@ -39,9 +40,9 @@
   <div id="intro" role="dialog" aria-modal="true">
     <div class="card">
       <h2>DuoLiftApp 3D</h2>
-      <p>Trascina i pezzi in 3D e componi il ponte: base → colonne → motore/centralina → bracci telescopici (3 per lato).<br/>Rotazione camera: trascina il vuoto • Zoom: rotellina • Pan: Alt/Option + drag.</p>
+      <p>Build anti-cache: se un vecchio Service Worker blocca ancora, questa pagina lo disattiva automaticamente.</p>
       <div class="foot">
-        <span>Three.js • No Service Worker</span>
+        <span>Local/ CDN fallback • No PWA</span>
         <div style="display:flex;gap:8px">
           <button id="startBtn" class="btn">Inizia</button>
           <a class="btn" href="readme.html" target="_blank" rel="noopener">Guida</a>
@@ -50,7 +51,47 @@
     </div>
   </div>
 
-  <script type="module" src="app3d.js"></script>
-  <script>/* No SW: niente cache, zero conflitti */</script>
+  <div id="err"></div>
+
+  <!-- SW killer -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.unregister());
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({type:'SKIP'});
+        }
+      });
+    }
+  </script>
+
+  <!-- Loader: try local libs first, else CDN -->
+  <script type="module">
+    const errBox = document.getElementById('err');
+    function showErr(msg){ errBox.textContent = msg; errBox.style.display = 'block'; console.error(msg); }
+    const start = async () => {
+      try {
+        // try local
+        const mod = await import('./lib/app3d.main.js');
+        mod.boot();
+      } catch(e){
+        try {
+          // fallback CDN
+          const mod = await import('https://cdn.jsdelivr.net/gh/pezzaliapp/duolift-fallback@main/app3d.cdn.js');
+          mod.boot();
+        } catch(e2){
+          showErr('Errore nel caricare i moduli. Prova a ricaricare o controllare la rete.');
+        }
+      }
+    };
+    window.__duolift_start = start;
+  </script>
+  <script>
+    // click handler after modules load
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('startBtn').addEventListener('click', ()=>window.__duolift_start && window.__duolift_start());
+      document.getElementById('btnReset').addEventListener('click', ()=>window.__duolift_reset && window.__duolift_reset());
+    });
+  </script>
 </body>
 </html>
