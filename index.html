@@ -1,26 +1,28 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DuoLiftApp 3D — Ponte 2 Colonne</title>
-  <meta name="theme-color" content="#0b5fff"/>
-  <style>
-    :root{--bg:#0a0d14;--fg:#e5f0ff}
-    *{box-sizing:border-box}
-    html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
-    header{position:fixed;top:0;left:0;right:0;z-index:5;background:#0b5fff;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
-    #viewport{position:fixed;inset:56px 0 0 0}
-    #hud{position:fixed;right:12px;top:64px;z-index:6;display:grid;gap:8px}
-    .chip{background:#131b2e;border:1px solid rgba(255,255,255,.12);padding:8px 10px;border-radius:10px;font-size:12px}
-    #intro{position:fixed;inset:0;background:linear-gradient(180deg,#020409,#0a0d14);display:flex;align-items:center;justify-content:center;z-index:10}
-    .card{width:min(760px,92vw);border-radius:16px;background:#0e1628;color:#fff;box-shadow:0 20px 80px rgba(0,0,0,.45);padding:20px;border:1px solid rgba(255,255,255,.12)}
-    .btn{border:0;border-radius:10px;padding:8px 12px;background:#101828;color:#fff;cursor:pointer}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DuoLiftApp 3D — WebGL (no librerie)</title>
+<style>
+  :root{--bg:#0a0d14;--fg:#e5f0ff;--acc:#0b5fff}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  header{position:fixed;top:0;left:0;right:0;z-index:5;background:#0b5fff;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  header h1{font-size:16px;margin:0;font-weight:700}
+  .btn{border:0;border-radius:10px;padding:8px 12px;background:#101828;color:#fff;cursor:pointer}
+  #viewport{position:fixed;inset:56px 0 0 0}
+  #webgl{width:100%;height:100%;display:block}
+  #hud{position:fixed;right:12px;top:64px;z-index:6;display:grid;gap:8px}
+  .chip{background:#131b2e;border:1px solid rgba(255,255,255,.12);padding:8px 10px;border-radius:10px;font-size:12px}
+  #intro{position:fixed;inset:0;background:linear-gradient(180deg,#020409,#0a0d14);display:flex;align-items:center;justify-content:center;z-index:10}
+  .card{width:min(760px,92vw);border-radius:16px;background:#0e1628;color:#fff;box-shadow:0 20px 80px rgba(0,0,0,.45);padding:20px;border:1px solid rgba(255,255,255,.12)}
+  .foot{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+</style>
 </head>
 <body>
   <header>
-    <h1>🛠️ DuoLiftApp 3D</h1>
+    <h1>🛠️ DuoLiftApp 3D — WebGL</h1>
     <button id="btnReset" class="btn">↺ Reset</button>
   </header>
 
@@ -30,23 +32,393 @@
     <div class="chip">⏱️ <span id="time">00:00</span></div>
     <div class="chip">🧩 <span id="placed">0</span>/<span id="total">0</span></div>
     <div class="chip">⭐ <span id="score">0</span></div>
+    <div class="chip">Controlli: drag vuoto=orbita • tasto destro=pan • rotellina=zoom • drag pezzo=muovi • Q/E=ruota</div>
   </div>
 
   <div id="intro">
     <div class="card">
-      <h2>DuoLiftApp 3D</h2>
-      <p>Trascina i pezzi e agganciali alle sagome. Con un pezzo selezionato premi <b>Q/E</b> per ruotarlo.</p>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button id="startBtn" class="btn">Inizia</button>
-      </div>
+      <h2>DuoLiftApp 3D (WebGL puro)</h2>
+      <p>Versione senza librerie. Trascina i pezzi sul piano per montarli. Allineamento con tolleranza e angolo (±10°).</p>
+      <div class="foot"><button id="startBtn" class="btn">Inizia</button></div>
     </div>
   </div>
 
-  <!-- Three.js GLOBALI (nessun modulo) — usa jsDelivr che funziona bene con GitHub Pages -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ======== Matematica 3D di base ========
+function mat4Identity(){return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]}
+function mat4Mul(a,b){
+  const o=new Array(16).fill(0);
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++) for(let k=0;k<4;k++) o[r*4+c]+=a[r*4+k]*b[k*4+c];
+  return o;
+}
+function mat4Translate(x,y,z){const m=mat4Identity(); m[12]=x; m[13]=y; m[14]=z; return m;}
+function mat4Scale(x,y,z){const m=mat4Identity(); m[0]=x; m[5]=y; m[10]=z; return m;}
+function mat4RotY(a){const c=Math.cos(a),s=Math.sin(a);return [c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]}
+function mat4Perspective(fovy,aspect,near,far){
+  const f=1/Math.tan(fovy/2), nf=1/(near-far);
+  return [f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,(2*far*near)*nf,0];
+}
+function vec3(x=0,y=0,z=0){return new Float32Array([x,y,z])}
+function vec3Add(a,b){return vec3(a[0]+b[0],a[1]+b[1],a[2]+b[2])}
+function vec3Sub(a,b){return vec3(a[0]-b[0],a[1]-b[1],a[2]-b[2])}
+function vec3Dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]}
+function vec3Cross(a,b){return vec3(a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0])}
+function vec3Norm(a){const l=Math.hypot(a[0],a[1],a[2])||1;return vec3(a[0]/l,a[1]/l,a[2]/l)}
+function mat4LookAt(eye,center,up){
+  const f=vec3Norm(vec3Sub(center,eye)), s=vec3Norm(vec3Cross(f,up)), u=vec3Cross(s,f);
+  return [ s[0], u[0],-f[0],0,  s[1], u[1],-f[1],0,  s[2], u[2],-f[2],0,  -vec3Dot(s,eye), -vec3Dot(u,eye), vec3Dot(f,eye), 1 ];
+}
+function mat4Invert(m){ // general 4x4 inverse via glMatrix-like method
+  const a = new Float32Array(m);
+  const inv = new Float32Array(16);
+  inv[0]=a[5]*a[10]*a[15]-a[5]*a[11]*a[14]-a[9]*a[6]*a[15]+a[9]*a[7]*a[14]+a[13]*a[6]*a[11]-a[13]*a[7]*a[10];
+  inv[4]=-a[4]*a[10]*a[15]+a[4]*a[11]*a[14]+a[8]*a[6]*a[15]-a[8]*a[7]*a[14]-a[12]*a[6]*a[11]+a[12]*a[7]*a[10];
+  inv[8]=a[4]*a[9]*a[15]-a[4]*a[11]*a[13]-a[8]*a[5]*a[15]+a[8]*a[7]*a[13]+a[12]*a[5]*a[11]-a[12]*a[7]*a[9];
+  inv[12]=-a[4]*a[9]*a[14]+a[4]*a[10]*a[13]+a[8]*a[5]*a[14]-a[8]*a[6]*a[13]-a[12]*a[5]*a[10]+a[12]*a[6]*a[9];
+  inv[1]=-a[1]*a[10]*a[15]+a[1]*a[11]*a[14]+a[9]*a[2]*a[15]-a[9]*a[3]*a[14]-a[13]*a[2]*a[11]+a[13]*a[3]*a[10];
+  inv[5]=a[0]*a[10]*a[15]-a[0]*a[11]*a[14]-a[8]*a[2]*a[15]+a[8]*a[3]*a[14]+a[12]*a[2]*a[11]-a[12]*a[3]*a[10];
+  inv[9]=-a[0]*a[9]*a[15]+a[0]*a[11]*a[13]+a[8]*a[1]*a[15]-a[8]*a[3]*a[13]-a[12]*a[1]*a[11]+a[12]*a[3]*a[9];
+  inv[13]=a[0]*a[9]*a[14]-a[0]*a[10]*a[13]-a[8]*a[1]*a[14]+a[8]*a[2]*a[13]+a[12]*a[1]*a[10]-a[12]*a[2]*a[9];
+  inv[2]=a[1]*a[6]*a[15]-a[1]*a[7]*a[14]-a[5]*a[2]*a[15]+a[5]*a[3]*a[14]+a[13]*a[2]*a[7]-a[13]*a[3]*a[6];
+  inv[6]=-a[0]*a[6]*a[15]+a[0]*a[7]*a[14]+a[4]*a[2]*a[15]-a[4]*a[3]*a[14]-a[12]*a[2]*a[7]+a[12]*a[3]*a[6];
+  inv[10]=a[0]*a[5]*a[15]-a[0]*a[7]*a[13]-a[4]*a[1]*a[15]+a[4]*a[3]*a[13]+a[12]*a[1]*a[7]-a[12]*a[3]*a[5];
+  inv[14]=-a[0]*a[5]*a[14]+a[0]*a[6]*a[13]+a[4]*a[1]*a[14]-a[4]*a[2]*a[13]-a[12]*a[1]*a[6]+a[12]*a[2]*a[5];
+  inv[3]=-a[1]*a[6]*a[11]+a[1]*a[7]*a[10]+a[5]*a[2]*a[11]-a[5]*a[3]*a[10]-a[9]*a[2]*a[7]+a[9]*a[3]*a[6];
+  inv[7]=a[0]*a[6]*a[11]-a[0]*a[7]*a[10]-a[4]*a[2]*a[11]+a[4]*a[3]*a[10]+a[8]*a[2]*a[7]-a[8]*a[3]*a[6];
+  inv[11]=-a[0]*a[5]*a[11]+a[0]*a[7]*a[9]+a[4]*a[1]*a[11]-a[4]*a[3]*a[9]-a[8]*a[1]*a[7]+a[8]*a[3]*a[5];
+  inv[15]=a[0]*a[5]*a[10]-a[0]*a[6]*a[9]-a[4]*a[1]*a[10]+a[4]*a[2]*a[9]+a[8]*a[1]*a[6]-a[8]*a[2]*a[5];
+  let det=a[0]*inv[0]+a[1]*inv[4]+a[2]*inv[8]+a[3]*inv[12];
+  det=det||1; for(let i=0;i<16;i++) inv[i]=inv[i]/det; return Array.from(inv);
+}
+function unproject(nx,ny, invVP){
+  const p=[nx,ny,1,1];
+  // inverse projection to world space at z=1
+  const x=invVP[0]*p[0]+invVP[4]*p[1]+invVP[8]*p[2]+invVP[12]*p[3];
+  const y=invVP[1]*p[0]+invVP[5]*p[1]+invVP[9]*p[2]+invVP[13]*p[3];
+  const z=invVP[2]*p[0]+invVP[6]*p[1]+invVP[10]*p[2]+invVP[14]*p[3];
+  const w=invVP[3]*p[0]+invVP[7]*p[1]+invVP[11]*p[2]+invVP[15]*p[3];
+  return vec3(x/w,y/w,z/w);
+}
+// ======== WebGL setup ========
+const canvas=document.getElementById('webgl');
+const gl=canvas.getContext('webgl', {antialias:true});
+if(!gl){ alert('WebGL non disponibile'); }
 
-  <!-- App -->
-  <script src="./app3d.js"></script>
+function fit(){ canvas.width = canvas.clientWidth = window.innerWidth; canvas.height = canvas.clientHeight = window.innerHeight-56; gl.viewport(0,0,canvas.width,canvas.height); }
+window.addEventListener('resize', fit); fit();
+
+// Shaders (lit)
+const vsrc=`attribute vec3 aPos; attribute vec3 aNormal; uniform mat4 uMVP; uniform mat4 uModel; varying vec3 vN; varying vec3 vPos; void main(){ vN = mat3(uModel)*aNormal; vPos = (uModel*vec4(aPos,1.0)).xyz; gl_Position = uMVP*vec4(aPos,1.0); }`;
+const fsrc=`precision mediump float; varying vec3 vN; varying vec3 vPos; uniform vec3 uColor; uniform vec3 uLightDir; uniform vec3 uAmbient; void main(){ vec3 N = normalize(vN); float diff = max(dot(N, normalize(uLightDir)), 0.0); vec3 col = uAmbient*uColor + diff*uColor; gl_FragColor = vec4(col,1.0); }`;
+// Shaders (flat color for picking)
+const vsrcP=`attribute vec3 aPos; uniform mat4 uMVP; void main(){ gl_Position = uMVP*vec4(aPos,1.0); }`;
+const fsrcP=`precision mediump float; uniform vec3 uPickColor; void main(){ gl_FragColor = vec4(uPickColor,1.0); }`;
+
+function makeProg(vs,fs){
+  const vsO=gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vsO,vs); gl.compileShader(vsO);
+  const fsO=gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fsO,fs); gl.compileShader(fsO);
+  const p=gl.createProgram(); gl.attachShader(p,vsO); gl.attachShader(p,fsO); gl.linkProgram(p);
+  return p;
+}
+const prog=makeProg(vsrc,fsrc);
+const progP=makeProg(vsrcP,fsrcP);
+
+// Box geometry
+function makeBox(w,h,d){
+  const x=w/2, y=h/2, z=d/2;
+  const V=[ // position, normals per face
+    // +X
+    x,-y,-z, 1,0,0,  x,y,-z, 1,0,0,  x,y, z, 1,0,0,  x,-y, z, 1,0,0,
+    // -X
+    -x,-y, z, -1,0,0,  -x,y, z, -1,0,0,  -x,y,-z, -1,0,0,  -x,-y,-z, -1,0,0,
+    // +Y
+    -x,y,-z, 0,1,0,  -x,y, z, 0,1,0,  x,y, z, 0,1,0,  x,y,-z, 0,1,0,
+    // -Y
+    -x,-y, z, 0,-1,0,  -x,-y,-z, 0,-1,0,  x,-y,-z, 0,-1,0,  x,-y, z, 0,-1,0,
+    // +Z
+    -x,-y,z, 0,0,1,  x,-y,z, 0,0,1,  x, y,z, 0,0,1,  -x, y,z, 0,0,1,
+    // -Z
+    x,-y,-z, 0,0,-1,  -x,-y,-z, 0,0,-1,  -x, y,-z, 0,0,-1,  x, y,-z, 0,0,-1
+  ];
+  const I=[]; for(let f=0;f<6;f++){ const o=f*4; I.push(o,o+1,o+2, o,o+2,o+3); }
+  return {verts:new Float32Array(V), idx:new Uint16Array(I)};
+}
+function makeVAO(geo){
+  const vao=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vao); gl.bufferData(gl.ARRAY_BUFFER, geo.verts, gl.STATIC_DRAW);
+  const ibo=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.idx, gl.STATIC_DRAW);
+  return {vao,ibo, count:geo.idx.length};
+}
+const boxGeo = makeVAO(makeBox(1,1,1));
+
+// Scene objects
+function Mesh(w,h,d,color, yLevel=0.0, alpha=1.0){
+  return {w,h,d, color, y:yLevel, rotY:0, pos:[0,yLevel,0], placed:false, pickColor:[0,0,0], alpha};
+}
+
+const piecesDef = [
+  {id:'base',    size:[3.2,0.18,0.6], color:[0.65,0.68,0.78], pos:[0,0.09,0], rotY:0},
+  {id:'colL',    size:[0.18,2.4,0.24], color:[0.44,0.70,1.00], pos:[-1.0,1.2,0], rotY:0},
+  {id:'colR',    size:[0.18,2.4,0.24], color:[0.44,0.70,1.00], pos:[ 1.0,1.2,0], rotY:0},
+  {id:'motor',   size:[0.18,0.5,0.2],  color:[0.50,0.89,0.65], pos:[ 1.25,0.9,0.3], rotY:0},
+  {id:'control', size:[0.14,0.36,0.12],color:[0.89,0.89,0.50], pos:[ 1.25,1.5,0.3], rotY:0},
+  {id:'armL_1',  size:[0.8,0.12,0.12], color:[0.62,0.82,1.00], pos:[-0.82,0.5,0], rotY:0},
+  {id:'armL_2',  size:[0.5,0.10,0.10], color:[0.62,0.82,1.00], pos:[-0.22,0.5,0], rotY:0},
+  {id:'armL_3',  size:[0.3,0.08,0.08], color:[0.62,0.82,1.00], pos:[ 0.20,0.5,0], rotY:0},
+  {id:'armR_1',  size:[0.8,0.12,0.12], color:[0.62,0.82,1.00], pos:[ 0.82,0.5,0], rotY:Math.PI},
+  {id:'armR_2',  size:[0.5,0.10,0.10], color:[0.62,0.82,1.00], pos:[ 0.22,0.5,0], rotY:Math.PI},
+  {id:'armR_3',  size:[0.3,0.08,0.08], color:[0.62,0.82,1.00], pos:[-0.20,0.5,0], rotY:Math.PI}
+];
+
+const ghosts=[], pieces=[];
+for(const g of piecesDef){
+  const ghost = Mesh(...g.size, g.color, g.pos[1], 0.13);
+  ghost.pos=[...g.pos]; ghost.rotY=g.rotY; ghost.isGhost=true;
+  ghosts.push(ghost);
+}
+// randomized start positions for pieces
+function rnd(a,b){return a+Math.random()*(b-a)}
+for(const g of piecesDef){
+  const p = Mesh(...g.size, g.color, g.pos[1], 1.0);
+  p.pos=[rnd(-2.5,2.5), rnd(0.2,1.2), 2.6 + rnd(-1.2,1.2)]; p.rotY=0; p.id=g.id; p.target=g;
+  pieces.push(p);
+}
+
+// Assign pick colors (unique id)
+const pickMap = new Map();
+function idToColor(id){ // id int -> 0..1 RGB
+  const r=((id>>16)&255)/255, g=((id>>8)&255)/255, b=(id&255)/255; return [r,g,b];
+}
+pieces.forEach((p,i)=>{ const id= i+1; p.pickId=id; p.pickColor=idToColor(id); pickMap.set(id,p); });
+
+// Camera/orbit
+let camTarget=vec3(0,0.8,0), camDist=5.2, camYaw=0.6, camPitch=0.5;
+function getCamera(){
+  const cx = camTarget[0] + camDist*Math.cos(camPitch)*Math.sin(camYaw);
+  const cy = camTarget[1] + camDist*Math.sin(camPitch);
+  const cz = camTarget[2] + camDist*Math.cos(camPitch)*Math.cos(camYaw);
+  return vec3(cx,cy,cz);
+}
+
+// Buffers & uniforms
+gl.enable(gl.DEPTH_TEST);
+function useProgLit(){
+  gl.useProgram(prog);
+  const stride = 6*4; // pos(3)*4 + norm(3)*4
+  const aPos = gl.getAttribLocation(prog,'aPos'); gl.bindBuffer(gl.ARRAY_BUFFER, boxGeo.vao);
+  gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,stride,0); gl.enableVertexAttribArray(aPos);
+  const aN = gl.getAttribLocation(prog,'aNormal');
+  gl.vertexAttribPointer(aN,3,gl.FLOAT,false,stride,3*4); gl.enableVertexAttribArray(aN);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boxGeo.ibo);
+}
+function useProgPick(){
+  gl.useProgram(progP);
+  const aPos = gl.getAttribLocation(progP,'aPos'); gl.bindBuffer(gl.ARRAY_BUFFER, boxGeo.vao);
+  gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,6*4,0); gl.enableVertexAttribArray(aPos);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boxGeo.ibo);
+}
+
+// Draw helpers
+function drawMesh(m, view, proj, pick=false){
+  const M = mat4Mul(mat4Translate(m.pos[0],m.pos[1],m.pos[2]), mat4RotY(m.rotY));
+  const S = mat4Scale(m.w, m.h, m.d);
+  const model = mat4Mul(M,S);
+  const mvp = mat4Mul(mat4Mul(proj, view), model);
+  if(!pick){
+    useProgLit();
+    gl.uniformMatrix4fv(gl.getUniformLocation(prog,'uMVP'), false, new Float32Array(mvp));
+    gl.uniformMatrix4fv(gl.getUniformLocation(prog,'uModel'), false, new Float32Array(model));
+    gl.uniform3fv(gl.getUniformLocation(prog,'uColor'), new Float32Array(m.color));
+    gl.uniform3fv(gl.getUniformLocation(prog,'uLightDir'), new Float32Array([3,6,5]));
+    gl.uniform3fv(gl.getUniformLocation(prog,'uAmbient'), new Float32Array([0.25,0.28,0.35]));
+  }else{
+    useProgPick();
+    gl.uniformMatrix4fv(gl.getUniformLocation(progP,'uMVP'), false, new Float32Array(mvp));
+    gl.uniform3fv(gl.getUniformLocation(progP,'uPickColor'), new Float32Array(m.pickColor));
+  }
+  gl.drawElements(gl.TRIANGLES, boxGeo.count, gl.UNSIGNED_SHORT, 0);
+}
+
+// Grid
+function drawGrid(view,proj){
+  gl.lineWidth(1);
+  const step=0.5, half=5;
+  for(let i=-half;i<=half;i+=step){
+    drawLine([i,0,-half],[i,0,half],view,proj,[0.16,0.19,0.32]);
+    drawLine([-half,0,i],[half,0,i],view,proj,[0.10,0.13,0.25]);
+  }
+}
+function drawLine(a,b,view,proj,color){
+  const vsrcL=`attribute vec3 aPos; uniform mat4 uMVP; void main(){ gl_Position = uMVP*vec4(aPos,1.0);} `;
+  const fsrcL=`precision mediump float; uniform vec3 uColor; void main(){ gl_FragColor = vec4(uColor,1.0);} `;
+  if(!drawLine.prog){
+    drawLine.prog=makeProg(vsrcL,fsrcL);
+  }
+  const progL=drawLine.prog;
+  const data=new Float32Array([...a,...b]);
+  const vbo=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vbo); gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
+  gl.useProgram(progL);
+  const aPos=gl.getAttribLocation(progL,'aPos'); gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,0,0); gl.enableVertexAttribArray(aPos);
+  const mvp=mat4Mul(mat4Mul(proj,view), mat4Identity());
+  gl.uniformMatrix4fv(gl.getUniformLocation(progL,'uMVP'), false, new Float32Array(mvp));
+  gl.uniform3fv(gl.getUniformLocation(progL,'uColor'), new Float32Array(color));
+  gl.drawArrays(gl.LINES,0,2);
+  gl.deleteBuffer(vbo);
+}
+
+// Picking FBO
+const pickTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,pickTex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,canvas.width,canvas.height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+const pickRB=gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER,pickRB); gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,canvas.width,canvas.height);
+const pickFBO=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,pickFBO);
+gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,pickTex,0);
+gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,pickRB);
+gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+function resizePick(){
+  gl.bindTexture(gl.TEXTURE_2D,pickTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,canvas.width,canvas.height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.bindRenderbuffer(gl.RENDERBUFFER,pickRB); gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,canvas.width,canvas.height);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+}
+window.addEventListener('resize', resizePick);
+
+// UI state
+const placedEl=document.getElementById('placed'), totalEl=document.getElementById('total'), scoreEl=document.getElementById('score'), timeEl=document.getElementById('time');
+const intro=document.getElementById('intro'), startBtn=document.getElementById('startBtn'), btnReset=document.getElementById('btnReset');
+let started=false, t0=0, score=0;
+totalEl.textContent = pieces.length.toString();
+
+// Dragging/picking
+let dragging=null; let dragY=0; let dragRot=0;
+canvas.addEventListener('pointerdown', (e)=>{
+  const rect=canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left, y=rect.height-(e.clientY-rect.top);
+  // render pick pass
+  const eye=getCamera();
+  const view=mat4LookAt(eye, camTarget, vec3(0,1,0));
+  const proj=mat4Perspective(Math.PI/3, canvas.width/canvas.height, 0.1, 100);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,pickFBO);
+  gl.viewport(0,0,canvas.width,canvas.height);
+  gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  ghosts.forEach(()=>{}); // do not pick ghosts
+  pieces.filter(p=>!p.placed).forEach(p=>{
+    useProgPick();
+    const M = mat4Mul(mat4Translate(p.pos[0],p.pos[1],p.pos[2]), mat4RotY(p.rotY));
+    const S = mat4Scale(p.w,p.h,p.d);
+    const model = mat4Mul(M,S); const mvp=mat4Mul(mat4Mul(proj,view),model);
+    gl.uniformMatrix4fv(gl.getUniformLocation(progP,'uMVP'), false, new Float32Array(mvp));
+    gl.uniform3fv(gl.getUniformLocation(progP,'uPickColor'), new Float32Array(p.pickColor));
+    gl.drawElements(gl.TRIANGLES, boxGeo.count, gl.UNSIGNED_SHORT, 0);
+  });
+  const pix=new Uint8Array(4); gl.readPixels(x,y,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pix);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  const id=(pix[0]<<16)|(pix[1]<<8)|pix[2];
+  if(pickMap.has(id)){
+    dragging = pickMap.get(id);
+    dragY = dragging.pos[1];
+    dragRot = dragging.rotY;
+    canvas.setPointerCapture(e.pointerId);
+  }else{
+    dragging=null;
+    // start orbit drag
+    orbiting=true; lastX=e.clientX; lastY=e.clientY; orbitButton = (e.buttons===2 ? 2 : 1);
+  }
+});
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+let orbiting=false, lastX=0,lastY=0, orbitButton=1;
+canvas.addEventListener('pointermove', (e)=>{
+  if(dragging){
+    // ray-plane intersection at y=dragY
+    const nx =  (e.clientX/canvas.clientWidth)*2-1;
+    const ny = -(e.clientY/(canvas.clientHeight))*2+1;
+    const eye=getCamera();
+    const view=mat4LookAt(eye, camTarget, vec3(0,1,0));
+    const proj=mat4Perspective(Math.PI/3, canvas.width/canvas.height, 0.1, 100);
+    const invVP=mat4Invert(mat4Mul(proj,view));
+    const pFar=unproject(nx,ny,invVP);
+    const rayDir=vec3Norm(vec3Sub(pFar, eye));
+    // y-plane
+    const t = (dragY - eye[1]) / (rayDir[1]||1e-6);
+    const hit = vec3(eye[0]+rayDir[0]*t, dragY, eye[2]+rayDir[2]*t);
+    dragging.pos=[hit[0], dragY, hit[2]];
+  }else if(orbiting){
+    const dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+    if(orbitButton===2){ // pan
+      // pan in screen space -> world
+      const s=0.003*camDist; camTarget=vec3(camTarget[0]-dx*s, camTarget[1]+dy*s, camTarget[2]);
+    }else{
+      camYaw += dx*0.01; camPitch += dy*0.01; camPitch=Math.max(-1.2, Math.min(1.2, camPitch));
+    }
+  }
+});
+canvas.addEventListener('pointerup', (e)=>{
+  if(dragging){
+    trySnap(dragging);
+    dragging=null;
+  }
+  orbiting=false; canvas.releasePointerCapture(e.pointerId);
+});
+canvas.addEventListener('wheel',(e)=>{ camDist *= (1 + (e.deltaY>0?0.1:-0.1)); camDist=Math.max(1.5, Math.min(15, camDist)); });
+
+window.addEventListener('keydown', (e)=>{
+  if(!dragging) return;
+  if(e.key.toLowerCase()==='q') dragging.rotY -= Math.PI/12;
+  if(e.key.toLowerCase()==='e') dragging.rotY += Math.PI/12;
+});
+
+function trySnap(p){
+  const t = p.target;
+  const posOk = Math.hypot(p.pos[0]-t.pos[0], p.pos[2]-t.pos[2]) < 0.18;
+  const dAng = Math.abs(((p.rotY - t.rotY + Math.PI)%(2*Math.PI))-Math.PI);
+  const angOk = dAng < (Math.PI/18);
+  if(posOk && angOk){
+    p.pos=[...t.pos]; p.rotY=t.rotY; p.placed=true; score+=100;
+    scoreEl.textContent=String(score);
+    placedEl.textContent=String(pieces.filter(x=>x.placed).length);
+    if(pieces.every(x=>x.placed)){ score+=250; scoreEl.textContent=String(score); toast('✅ Ponte completato!'); }
+  }
+}
+
+function toast(msg){
+  const el=document.createElement('div'); el.textContent=msg;
+  Object.assign(el.style,{position:'fixed',left:'50%',top:'16px',transform:'translateX(-50%)',background:'#0f5132',color:'#fff',padding:'10px 14px',borderRadius:'10px',zIndex:20});
+  document.body.appendChild(el); setTimeout(()=>el.remove(),1600);
+}
+
+// Timer
+function tick(t){
+  if(started){
+    const s=Math.floor((t-t0)/1000); const mm=(''+Math.floor(s/60)).padStart(2,'0'); const ss=(''+(s%60)).padStart(2,'0');
+    timeEl.textContent = mm+':'+ss;
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// Render loop
+function render(){
+  gl.viewport(0,0,canvas.width,canvas.height);
+  gl.clearColor(0.04,0.06,0.1,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  const eye=getCamera();
+  const view=mat4LookAt(eye, camTarget, vec3(0,1,0));
+  const proj=mat4Perspective(Math.PI/3, canvas.width/canvas.height, 0.1, 100);
+  // grid
+  drawGrid(view,proj);
+  // ghosts
+  ghosts.forEach(g=> drawMesh(g, view, proj, false));
+  // pieces
+  pieces.forEach(p=> drawMesh(p, view, proj, false));
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+// UI
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  score=0; scoreEl.textContent='0'; placedEl.textContent='0'; pieces.forEach(p=>{ p.placed=false; p.pos=[Math.random()*5-2.5, Math.random()*1+0.2, 2.6+Math.random()*2-1]; p.rotY=0; });
+});
+document.getElementById('startBtn').addEventListener('click', ()=>{ started=true; t0=performance.now(); document.getElementById('intro').style.display='none'; });
+
+</script>
 </body>
 </html>
