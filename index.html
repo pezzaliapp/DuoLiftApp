@@ -2,170 +2,22 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,height=device-height,user-scalable=no,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0" />
-  <title>DuoLiftApp — Puzzle Lift 2 Colonne</title>
-  <meta name="description" content="Assembla un ponte sollevatore a due colonne con bracci telescopici. PWA gioco open‑source."/>
-  <meta name="theme-color" content="#0b5fff" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DuoLiftApp v3 — Ponte 2 Colonne</title>
+  <meta name="theme-color" content="#0b5fff"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" sizes="192x192" href="icons/icon-192.png"/>
   <style>
-    @keyframes curtainIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
-    @keyframes glow{0%{box-shadow:0 0 0 0 rgba(255,106,0,.0)}50%{box-shadow:0 0 0 6px rgba(255,106,0,.15)}100%{box-shadow:0 0 0 0 rgba(255,106,0,.0)}}
-    :root{
-      --bg:#0a0d14;
-      --fg:#e5f0ff;
-      --acc:#0b5fff;
-      --good:#15b374;
-      --bad:#ff4d4f;
-    }
-    *{box-sizing:border-box;touch-action:none}
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
-    header{
-      position:sticky;top:0;z-index:4;
-      display:flex;align-items:center;justify-content:space-between;
-      padding:10px 14px;background:#0b5fff;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.25)
-    }
-    header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px}
-    .btn{border:0;border-radius:10px;padding:8px 12px;background:#101828;color:#fff;cursor:pointer}
-    .btn.primary{background:var(--acc)}
-    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.25)}
-    .wrap{display:grid;grid-template-columns:1fr;grid-auto-rows:minmax(0,1fr);height:calc(100% - 56px)}
-    #game{position:relative;display:grid;grid-template-rows:auto 1fr auto;height:100%}
-    #hud{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;background:#0d1220;border-bottom:1px solid rgba(255,255,255,.08)}
-    #hud .stat{font-size:13px;opacity:.9}
-    #stage{position:relative;overflow:hidden}
-    canvas{display:block;width:100%;height:100%}
-    #videoBg{position:absolute;inset:0;object-fit:cover;filter:contrast(1.05) saturate(1.1) brightness(.9);opacity:.25;display:none}
-    #piecesBar{display:flex;gap:8px;overflow:auto;padding:8px;background:#0d1220;border-top:1px solid rgba(255,255,255,.08)}
-    .chip{min-width:120px;background:#131b2e;border:1px solid rgba(255,255,255,.1);padding:6px 8px;border-radius:10px}
-    .chip h3{font-size:12px;margin:0 0 4px 0}
-    .chip p{margin:0;font-size:11px;opacity:.8}
-    #intro{
-      position:fixed;inset:0;background:linear-gradient(180deg, #020409 0%, #0a0d14 100%);
-      display:flex;align-items:center;justify-content:center;z-index:10;
-    }
-    .card{
-      width:min(760px,92vw);border-radius:16px;background:#0e1628;color:#fff;
-      box-shadow:0 20px 80px rgba(0,0,0,.45);padding:20px;border:1px solid rgba(255,255,255,.12)
-    }
-    .card h2{margin:0 0 8px 0}
-    .grid{display:grid;grid-template-columns:1fr;gap:12px}
-    .grid > *{border-radius:12px;border:1px solid rgba(255,255,255,.12);padding:12px;background:#0b1324}
-    .foot{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:12px}
-    .pill{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
-    .ok{color:#0fe18b}
-    .err{color:#ff8a8a}
-    @media(min-width:900px){
-      .wrap{grid-template-columns: 320px 1fr}
-      #sidebar{border-right:1px solid rgba(255,255,255,.08);background:#0d1220;padding:12px;display:block}
-    }
-    #sidebar{display:none}
-    .kudos{opacity:.7;font-size:12px}
-    a{color:#78aaff}
-  
-    /* Theatre intro */
-    #theatre{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;z-index:30;overflow:hidden}
-    #theatre .stage{position:relative;width:100%;height:100%}
-    .curtain{position:absolute;top:0;bottom:0;width:55%;background:linear-gradient(90deg,#3a0a00,#bf3b00);box-shadow:inset 0 0 60px rgba(0,0,0,.6)}
-    .curtain.left{left:0;transform:translateX(0);transition:transform 1.2s ease-in-out}
-    .curtain.right{right:0;transform:translateX(0);transition:transform 1.2s ease-in-out}
-    #theatre.open .curtain.left{transform:translateX(-120%)}
-    #theatre.open .curtain.right{transform:translateX(120%)}
-    #theatre .title{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ffd7b3;text-align:center;gap:8px}
-    #theatre .title .line{opacity:.95;letter-spacing:.5px}
-    #theatre .title .strong{font-size:38px;font-weight:800;color:#fff}
-    #theatre .title .small{font-size:12px;opacity:.8}
-    /* Brand palettes */
-    :root[data-brand="cormach"]{--acc:#ff6a00;--bg:#0b0b0b;--fg:#fff9f2}
-    :root[data-brand="cormach"] header{background:#ff6a00}
-    :root[data-brand="cormach"] a{color:#ffd1b3}
-    :root[data-brand="cormach"] .btn.primary{background:#ff6a00}
-
+    body{margin:0;font-family:sans-serif;background:#0a0d14;color:#e5f0ff;text-align:center}
+    header{background:#0b5fff;color:#fff;padding:12px;font-weight:bold}
+    canvas{display:block;width:100%;height:80vh;background:#111}
+    #hud{padding:10px}
   </style>
 </head>
 <body>
-  <header>
-    <h1>🚗 DuoLiftApp — Ponte 2 Colonne</h1>
-    <div style="display:flex;gap:8px"><button id="btnBrand" class="btn ghost" aria-pressed="false">🎨 Cormach</button><button id="btnSound" class="btn ghost" aria-pressed="true">🔊 Suoni</button>
-      <button id="btnCamera" class="btn ghost" aria-pressed="false">🎥 Sfondo Camera</button>
-      <button id="btnRotate" class="btn ghost" title="Ruota (R)">⟳ Ruota</button>
-      <button id="btnReset" class="btn">↺ Reset</button>
-      <button id="btnInstall" class="btn primary" hidden>➕ Installa</button>
-    </div>
-  </header>
-
-  <div id="theatre" aria-hidden="true">
-    <div class="stage">
-      <div class="curtain left"></div>
-      <div class="curtain right"></div>
-      <div class="title">
-        <div class="line">Il sipario si apre…</div>
-        <div class="line strong">DuoLiftApp</div>
-        <div class="line small">KubeApp · Edizione Officina</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="wrap">
-    <aside id="sidebar" aria-label="Opzioni">
-      <h3>Opzioni</h3>
-      <div class="grid">
-        <div>
-          <strong>Tema colore</strong><br/>
-          <button class="btn ghost" data-theme="blue">Blu</button>
-          <button class="btn ghost" data-theme="yellow">Giallo</button>
-          <button class="btn ghost" data-theme="red">Rosso</button>
-          <button class="btn ghost" data-theme="cormach">Cormach</button>
-        </div>
-        <div>
-          <strong>Difficoltà</strong><br/>
-          <button class="btn ghost" data-diff="easy">Facile</button>
-          <button class="btn ghost" data-diff="pro">Pro</button>
-        </div>
-        <div>
-          <strong>Audio</strong><br/>
-          <button class="btn ghost" id="btnSfx">SFX: On</button>
-        </div>
-        <div class="kudos">
-          <p>Open‑source • MIT • Offline • Mobile/Desktop</p>
-        </div>
-      </div>
-    </aside>
-
-    <main id="game">
-      <div id="hud">
-        <div class="stat">⏱️ Tempo: <span id="time">00:00</span></div>
-        <div class="stat">🧩 Pezzi posati: <span id="placed">0</span>/<span id="total">0</span></div>
-        <div class="stat">⭐ Punteggio: <span id="score">0</span></div>
-      </div>
-      <section id="stage">
-        <video id="videoBg" autoplay muted playsinline></video>
-        <canvas id="c"></canvas>
-      </section>
-      <div id="piecesBar" aria-label="Pezzi disponibili"></div>
-    </main>
-  </div>
-
-  <div id="intro" role="dialog" aria-modal="true">
-    <div class="card" style="animation:curtainIn .7s ease-out both">
-      <h2 style="letter-spacing:.5px">🎬 DuoLiftApp — Atto I</h2>
-      <p>Assembla un <strong>ponte sollevatore a due colonne</strong>: colonne simmetriche, bracci telescopici (3 sfilate), centralina/motore e base. Trascina i pezzi sul blueprint e rilasciali quando vedi l’aggancio magnetico.</p>
-      <div class="grid">
-        <div><strong>🎮 Come si gioca</strong><br/>Trascina i pezzi dal basso sul piano. Allinea alle aree tratteggiate. Ogni incastro corretto vale punti, gli errori tolgono tempo.</div>
-        <div><strong>🎥 Modalità Camera</strong><br/>Attiva lo sfondo camera per un tocco “AR”. Nessun dato lascia il tuo dispositivo.</div>
-        <div><strong>🏁 Obiettivo</strong><br/>Completa il ponte rispettando la <em>simmetria</em> delle colonne e il montaggio dei bracci: base → colonne → motore/centralina → bracci.</div>
-      </div>
-      <div class="foot">
-        <span class="pill">PWA • Offline • Open‑source</span>
-        <div style="display:flex;gap:8px"><button id="btnBrand" class="btn ghost" aria-pressed="false">🎨 Cormach</button><button id="btnSound" class="btn ghost" aria-pressed="true">🔊 Suoni</button>
-          <button id="startBtn" class="btn primary">Inizia</button>
-          <a class="btn ghost" href="readme.html" target="_blank" rel="noopener">Guida</a>
-        </div>
-      </div>
-    </div>
-  </div>
-
+  <header>🚗 DuoLiftApp v3 — Debug</header>
+  <canvas id="c"></canvas>
+  <div id="hud">HUD</div>
   <script src="app.js"></script>
 </body>
 </html>

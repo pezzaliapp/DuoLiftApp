@@ -1,7 +1,6 @@
 {
-  "name": "DuoLiftApp — Ponte 2 Colonne",
-  "short_name": "DuoLiftApp",
-  "description": "Assembla un ponte sollevatore auto a due colonne con bracci telescopici. Puzzle PWA con modalità camera.",
+  "name": "DuoLiftApp v3",
+  "short_name": "DuoLift",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0d14",
