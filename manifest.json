@@ -1,6 +1,6 @@
 {
-  "name": "DuoLiftApp v3",
-  "short_name": "DuoLift",
+  "name": "DuoLiftApp 3D",
+  "short_name": "DuoLift3D",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0d14",
