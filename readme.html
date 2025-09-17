@@ -2,6 +2,6 @@
 <html lang="it"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>DuoLiftApp 3D — Guida</title>
 <style>body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;color:#1f2937}header{background:#0b5fff;color:#fff;padding:18px 16px}main{padding:16px;max-width:900px;margin:auto}code{background:#f1f5f9;padding:2px 6px;border-radius:6px}</style></head>
 <body><header><h1>DuoLiftApp 3D — Guida</h1></header><main>
-<p>Build con disattivazione automatica di eventuali Service Worker rimasti in cache. Carica la cartella su GitHub Pages e apri <code>index.html</code>.</p>
-<p>Se il caricamento dei moduli dal CDN venisse bloccato dalla rete, la pagina mostra un messaggio di errore in alto.</p>
+<p>Questa build usa <strong>script globali</strong> dal CDN (no moduli ES). È la soluzione più compatibile con GitHub Pages.</p>
+<p>Se la tua rete blocca <code>unpkg.com</code>, sostituisci gli script con <code>https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js</code> e <code>https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js</code>.</p>
 </main></body></html>
