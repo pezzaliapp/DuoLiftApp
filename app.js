@@ -1,21 +1,28 @@
-/* DuoLiftApp — Game logic
-   Copyright (c) 2025
+/* DuoLiftApp — Game logic (Enhanced)
+   - Theatre intro like KubeApp
+   - Brand palette toggle (Cormach)
+   - Sounds via WebAudio (no external assets)
+   - Pro mode: rotation for arms, extra pieces (tamponi, piastre, fermo)
    MIT License
 */
 (() => {
-  const canvas = document.getElementById('c');
+  const $ = sel => document.querySelector(sel);
+  const canvas = $('#c');
   const ctx = canvas.getContext('2d');
-  const video = document.getElementById('videoBg');
-  const bar = document.getElementById('piecesBar');
-  const placedEl = document.getElementById('placed');
-  const totalEl = document.getElementById('total');
-  const scoreEl = document.getElementById('score');
-  const timeEl = document.getElementById('time');
-  const btnReset = document.getElementById('btnReset');
-  const btnCamera = document.getElementById('btnCamera');
-  const btnInstall = document.getElementById('btnInstall');
-  const intro = document.getElementById('intro');
-  const startBtn = document.getElementById('startBtn');
+  const video = $('#videoBg');
+  const bar = $('#piecesBar');
+  const placedEl = $('#placed');
+  const totalEl = $('#total');
+  const scoreEl = $('#score');
+  const timeEl = $('#time');
+  const btnReset = $('#btnReset');
+  const btnCamera = $('#btnCamera');
+  const btnInstall = $('#btnInstall');
+  const intro = $('#intro');
+  const startBtn = $('#startBtn');
+  const theatre = $('#theatre');
+  const btnBrand = $('#btnBrand');
+  const btnSound = $('#btnSound');
 
   // Resize canvas to fit container
   function fit() {
@@ -31,6 +38,22 @@
   window.addEventListener('orientationchange', () => setTimeout(fit, 300));
   fit();
 
+  // WebAudio simple beeps
+  let audioOn = true;
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  function beep(freq=660, dur=0.08, type='sine', vol=0.05){
+    if (!audioOn) return;
+    const o = ac.createOscillator(); const g = ac.createGain();
+    o.frequency.value = freq; o.type = type;
+    g.gain.value = vol;
+    o.connect(g); g.connect(ac.destination);
+    o.start();
+    setTimeout(()=>{ g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur); o.stop(ac.currentTime + dur+0.02); }, 0);
+  }
+  function sndSnap(){ beep(880, .09, 'square', .06); }
+  function sndError(){ beep(220, .12, 'sawtooth', .07); }
+  function sndWin(){ [0,1,2].forEach(i=> setTimeout(()=>beep(640 + i*160, .09, 'triangle', .08), i*110)); }
+
   // Game model
   const state = {
     started:false,
@@ -42,26 +65,22 @@
     dragging:null,
     hoverTarget:null,
     theme:'blue',
-    difficulty:'easy'
+    difficulty:'easy', // easy or pro
+    brand: 'default'
   };
 
-  // Blueprint geometry constants (relative)
+  // Blueprint geometry
   function buildBlueprint() {
-    // Work area padding
     const W = canvas.clientWidth, H = canvas.clientHeight;
     const pad = 24;
-    const area = {x: pad, y: pad, w: W - pad*2, h: H - 140}; // leave space for HUD margins
-    // Base plate
+    const area = {x: pad, y: pad, w: W - pad*2, h: H - 140};
     const base = {id:'base', x: area.x + area.w*0.1, y: area.y + area.h*0.8, w: area.w*0.8, h: 18, rot:0};
-    // Columns symmetric
     const colW = 36, colH = area.h*0.62;
     const colL = {id:'colL', x: area.x + area.w*0.22, y: base.y - colH, w: colW, h: colH, rot:0};
     const colR = {id:'colR', x: area.x + area.w*0.78 - colW, y: base.y - colH, w: colW, h: colH, rot:0};
-    // Motor/Power unit on right column lower side
     const motor = {id:'motor', x: colR.x + colW + 10, y: colR.y + colH*0.55, w: 28, h: 48, rot:0};
     const control = {id:'control', x: colR.x + colW + 10, y: motor.y - 56, w: 24, h: 38, rot:0};
 
-    // Arms: 2 sides, each with 3 telescoping segments
     const armY = base.y - 28;
     const armLen = Math.min(140, area.w*0.28);
     const armH = 12;
@@ -74,41 +93,60 @@
       {id:'armR_3', x: colR.x - armLen*1.04, y: armY, w: armLen*0.22, h: armH, rot:0},
     ];
 
-    const targets = [base, colL, colR, motor, control, ...arms].map(t => ({...t, placed:false}));
-    state.targets = targets;
+    // Pro-only pieces
+    const padsY = armY - 10;
+    const padSize = 12;
+    const proPieces = [
+      {id:'padL', x: colL.x + colW + 6, y: padsY, w: padSize, h: padSize, rot:0},
+      {id:'padR', x: colR.x - 6 - padSize, y: padsY, w: padSize, h: padSize, rot:0},
+      {id:'plateL', x: colL.x + colW + 14, y: padsY - 18, w: 18, h: 6, rot:0},
+      {id:'plateR', x: colR.x - 14 - 18, y: padsY - 18, w: 18, h: 6, rot:0},
+      {id:'lock', x: base.x + base.w/2 - 10, y: base.y - 40, w: 20, h: 10, rot:0},
+    ];
+
+    const targets = [base, colL, colR, motor, control, ...arms];
+    if (state.difficulty === 'pro') targets.push(...proPieces);
+    state.targets = targets.map(t => ({...t, placed:false}));
   }
 
-  // Pieces to place (shuffle positions)
+  // Pieces bag
   function buildPieces() {
-    const names = state.targets.map(t => t.id);
     const W = canvas.clientWidth; const H = canvas.clientHeight;
     const bag = [];
-    for (const id of names) {
-      const tgt = state.targets.find(t => t.id === id);
+    for (const tgt of state.targets) {
       const piece = {
-        id,
+        id: tgt.id,
         x: 20 + Math.random()*(W-40),
         y: H - 120 + Math.random()*40,
         w: tgt.w, h: tgt.h,
-        rot:0,
+        rot: tgt.rot || 0,
         held:false,
         placed:false,
-        color: pickColorFor(id)
+        color: pickColorFor(tgt.id)
       };
       bag.push(piece);
     }
-    // Small tweak: motor/control pieces start in bar (we also render clones in bar UI list)
     state.pieces = bag;
     totalEl.textContent = String(bag.length);
   }
 
   function pickColorFor(id){
     const theme = state.theme;
-    if (id.startsWith('arm')) return theme === 'blue' ? '#9dd1ff' : theme === 'yellow' ? '#ffe08a' : '#ffb3b3';
-    if (id.startsWith('col')) return theme === 'blue' ? '#70b2ff' : theme === 'yellow' ? '#ffd666' : '#ff8f8f';
-    if (id==='base') return '#a6adc8';
-    if (id==='motor') return '#7fe3a6';
-    if (id==='control') return '#e3e37f';
+    const brand = state.brand;
+    const cBlue = {arm:'#9dd1ff', col:'#70b2ff'};
+    const cYel  = {arm:'#ffe08a', col:'#ffd666'};
+    const cRed  = {arm:'#ffb3b3', col:'#ff8f8f'};
+    const pal = theme==='blue'?cBlue: theme==='yellow'?cYel:cRed;
+    const col = pal.col, arm = pal.arm;
+    const accent = brand==='cormach' ? '#ff6a00' : '#7fe3a6';
+    if (id.startsWith('arm')) return arm;
+    if (id.startsWith('col')) return col;
+    if (id==='base') return brand==='cormach' ? '#ffc7a1' : '#a6adc8';
+    if (id==='motor') return accent;
+    if (id==='control') return brand==='cormach' ? '#ffe2cc' : '#e3e37f';
+    if (id==='padL' || id==='padR') return '#ffd24d';
+    if (id.startsWith('plate')) return '#d0d7e2';
+    if (id==='lock') return '#98f5d0';
     return '#c9d1ff';
   }
 
@@ -116,17 +154,12 @@
   function draw() {
     const W = canvas.clientWidth, H = canvas.clientHeight;
     ctx.clearRect(0,0,W,H);
-
-    // Blueprint guides
     drawBlueprint();
-
-    // Draw pieces (unplaced below, placed above)
+    // pieces: unplaced then placed
     const unplaced = state.pieces.filter(p=>!p.placed);
     const placed = state.pieces.filter(p=>p.placed);
     for (const p of unplaced) drawPiece(p, .9);
     for (const p of placed) drawPiece(p, 1.0, true);
-
-    // Hover highlight
     if (state.hoverTarget) {
       const t = state.hoverTarget;
       ctx.save();
@@ -136,7 +169,6 @@
       ctx.strokeRect(t.x, t.y, t.w, t.h);
       ctx.restore();
     }
-
     requestAnimationFrame(draw);
   }
 
@@ -147,20 +179,32 @@
     ctx.setLineDash([8,8]);
     ctx.lineWidth = 1.5;
     for (const t of state.targets) {
+      // draw as axis-aligned guides regardless of rotation
       ctx.strokeRect(t.x, t.y, t.w, t.h);
     }
-    // Ground line
-    ctx.setLineDash([]);
-    ctx.globalAlpha = .25;
-    ctx.beginPath();
-    ctx.moveTo(16, H-42); ctx.lineTo(W-16, H-42); ctx.stroke();
+    // centerline between columns
+    const colL = state.targets.find(t=>t.id==='colL');
+    const colR = state.targets.find(t=>t.id==='colR');
+    if (colL && colR){
+      ctx.setLineDash([3,6]);
+      ctx.beginPath();
+      const cx = (colL.x + colL.w/2 + colR.x + colR.w/2)/2;
+      ctx.moveTo(cx, 12); ctx.lineTo(cx, H-12); ctx.stroke();
+    }
+    // ground line
+    ctx.setLineDash([]); ctx.globalAlpha=.25;
+    ctx.beginPath(); ctx.moveTo(16, H-42); ctx.lineTo(W-16, H-42); ctx.stroke();
     ctx.restore();
   }
 
   function drawPiece(p, alpha=1, placed=false){
     ctx.save();
     ctx.globalAlpha = alpha;
-    roundedRect(p.x, p.y, p.w, p.h, 4);
+    // rotation support (for Pro)
+    ctx.translate(p.x + p.w/2, p.y + p.h/2);
+    ctx.rotate((p.rot||0) * Math.PI/180);
+    const rx = -p.w/2, ry = -p.h/2;
+    roundedRect(rx, ry, p.w, p.h, 4);
     ctx.fillStyle = p.color;
     ctx.fill();
     ctx.lineWidth = placed ? 1.2 : 1;
@@ -172,7 +216,7 @@
     ctx.textBaseline = 'middle';
     ctx.globalAlpha = alpha*0.9;
     const label = labelFor(p.id);
-    ctx.fillText(label, p.x + 6, p.y + p.h/2);
+    ctx.fillText(label, rx + 6, ry + p.h/2);
     ctx.restore();
   }
 
@@ -194,10 +238,15 @@
     if (id==='control') return 'Centralina';
     if (id.startsWith('armL')) return 'Braccio SX';
     if (id.startsWith('armR')) return 'Braccio DX';
+    if (id==='padL') return 'Tampone SX';
+    if (id==='padR') return 'Tampone DX';
+    if (id==='plateL') return 'Piastra SX';
+    if (id==='plateR') return 'Piastra DX';
+    if (id==='lock') return 'Fermocolonna';
     return id;
   }
 
-  // Drag interactions (mouse + touch)
+  // Drag + rotate (mouse/touch + wheel/R)
   let pointerId = null;
   canvas.addEventListener('pointerdown', (e)=>{
     pointerId = e.pointerId;
@@ -206,9 +255,10 @@
     if (p){
       state.dragging = p;
       p.held = true;
-      p._dx = pos.x - p.x;
-      p._dy = pos.y - p.y;
+      p._dx = pos.x - (p.x + p.w/2);
+      p._dy = pos.y - (p.y + p.h/2);
       canvas.setPointerCapture(pointerId);
+      beep(520,.05,'triangle',.03);
     }
   });
   canvas.addEventListener('pointermove', (e)=>{
@@ -216,9 +266,9 @@
     const pos = getPos(e);
     if (state.dragging){
       const p = state.dragging;
-      p.x = pos.x - p._dx;
-      p.y = pos.y - p._dy;
-      // snap detection
+      // position by center to keep rotation intuitive
+      p.x = pos.x - p._dx - p.w/2;
+      p.y = pos.y - p._dy - p.h/2;
       state.hoverTarget = matchTarget(p);
     }
   });
@@ -227,16 +277,17 @@
     if (state.dragging){
       const p = state.dragging;
       const t = matchTarget(p);
-      if (t && !t.placed && t.id === p.id){
-        // Snap
-        p.x = t.x; p.y = t.y; p.placed = true; t.placed = true;
+      if (t && !t.placed && t.id === p.id && angleClose(p.rot, t.rot||0)){
+        // Snap center to center
+        p.x = t.x; p.y = t.y; p.rot = t.rot||0; p.placed = true; t.placed = true;
         state.score += 100;
+        sndSnap();
         updatePlaced();
         pulseHud('#15b374');
         checkWin();
       } else {
-        // small penalty
         state.score = Math.max(0, state.score - 10);
+        sndError();
         pulseHud('#ff4d4f');
       }
       p.held = false;
@@ -247,17 +298,39 @@
     try { canvas.releasePointerCapture(e.pointerId); } catch{}
   });
 
+  // Rotate with mouse wheel or key R (Pro only)
+  canvas.addEventListener('wheel', (e)=>{
+    if (state.difficulty !== 'pro') return;
+    if (!state.dragging) return;
+    e.preventDefault();
+    const p = state.dragging;
+    p.rot = (p.rot + Math.sign(e.deltaY) * 5) % 360;
+  }, {passive:false});
+  window.addEventListener('keydown', (e)=>{
+    if (state.difficulty !== 'pro') return;
+    if (e.key.toLowerCase()==='r' && state.dragging){
+      state.dragging.rot = (state.dragging.rot + 15)%360;
+    }
+  });
+
+  function angleClose(a,b){ return Math.abs(((a-b+540)%360)-180) < 8; }
+
   function getPos(e){
     const r = canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
   function hitPiece(x,y){
-    // iterate top to bottom: pick last unplaced first to simulate z-order
     for (let i = state.pieces.length-1; i>=0; i--){
       const p = state.pieces[i];
       if (p.placed) continue;
-      if (x>=p.x && x<=p.x+p.w && y>=p.y && y<=p.y+p.h) return p;
+      // transform point into piece local space considering rotation
+      const cx = p.x + p.w/2, cy = p.y + p.h/2;
+      const dx = x - cx, dy = y - cy;
+      const ang = -(p.rot||0) * Math.PI/180;
+      const lx =  dx*Math.cos(ang) - dy*Math.sin(ang);
+      const ly =  dx*Math.sin(ang) + dy*Math.cos(ang);
+      if (lx>=-p.w/2 && lx<=p.w/2 && ly>=-p.h/2 && ly<=p.h/2) return p;
     }
     return null;
   }
@@ -266,7 +339,12 @@
     const tol = state.difficulty === 'easy' ? 22 : 10;
     for (const t of state.targets){
       if (t.placed || t.id !== p.id) continue;
-      if (Math.abs(p.x - t.x) < tol && Math.abs(p.y - t.y) < tol) return t;
+      if (Math.abs(p.x - t.x) < tol && Math.abs(p.y - t.y) < tol){
+        if (state.difficulty==='pro'){
+          if (!angleClose(p.rot, t.rot||0)) continue;
+        }
+        return t;
+      }
     }
     return null;
   }
@@ -279,11 +357,11 @@
 
   function checkWin(){
     if (state.pieces.every(p=>p.placed)){
-      // Symmetry check for columns & arms length ordering
       const ok = validateSymmetry();
       if (ok){
         state.score += 250;
         scoreEl.textContent = String(state.score);
+        sndWin();
         toast('✅ Ponte completato! Simmetria OK.','ok');
       } else {
         toast('⚠️ Ponte completato ma la simmetria/ordine bracci non è perfetto.','err');
@@ -295,7 +373,6 @@
     const colL = state.targets.find(t=>t.id==='colL');
     const colR = state.targets.find(t=>t.id==='colR');
     let sym = Math.abs((colL.x+colL.w/2) - (colR.x+colR.w/2)) > 20 ? false : true;
-    // Arms order by length (decreasing from base): 1 > 2 > 3 on both sides
     const aL1 = state.targets.find(t=>t.id==='armL_1').w;
     const aL2 = state.targets.find(t=>t.id==='armL_2').w;
     const aL3 = state.targets.find(t=>t.id==='armL_3').w;
@@ -365,6 +442,19 @@
     btnInstall.hidden = true;
   });
 
+  // Theatre open after Start
+  function openTheatreThenStart(){
+    theatre.classList.remove('open');
+    theatre.style.display = 'flex';
+    setTimeout(()=>{
+      theatre.classList.add('open');
+      setTimeout(()=>{
+        theatre.style.display = 'none';
+        start();
+      }, 1300);
+    }, 150);
+  }
+
   // Start / Reset
   function start(){
     state.started = true;
@@ -380,7 +470,7 @@
     start();
   }
 
-  startBtn.addEventListener('click', start);
+  startBtn.addEventListener('click', openTheatreThenStart);
   btnReset.addEventListener('click', reset);
 
   // Timer
@@ -399,7 +489,7 @@
   // Render loop
   draw();
 
-  // Sidebar controls (theme/difficulty)
+  // Sidebar-like controls (in header)
   document.querySelectorAll('[data-theme]').forEach(b=>{
     b.addEventListener('click', ()=>{
       state.theme = b.dataset.theme;
@@ -409,7 +499,34 @@
   document.querySelectorAll('[data-diff]').forEach(b=>{
     b.addEventListener('click', ()=>{
       state.difficulty = b.dataset.diff;
+      reset();
     });
+  });
+
+  // Brand toggle
+  btnBrand.addEventListener('click', ()=>{
+    const root = document.documentElement;
+    const on = root.getAttribute('data-brand') === 'cormach';
+    if (on){
+      root.removeAttribute('data-brand');
+      btnBrand.setAttribute('aria-pressed','false');
+      btnBrand.textContent = '🎨 Cormach';
+      state.brand = 'default';
+    } else {
+      root.setAttribute('data-brand', 'cormach');
+      btnBrand.setAttribute('aria-pressed','true');
+      btnBrand.textContent = '🎨 Default';
+      state.brand = 'cormach';
+    }
+    state.pieces.forEach(p=> p.color = pickColorFor(p.id));
+  });
+
+  // Sound toggle
+  btnSound.addEventListener('click', ()=>{
+    audioOn = !audioOn;
+    btnSound.setAttribute('aria-pressed', audioOn?'true':'false');
+    btnSound.textContent = audioOn? '🔊 Suoni' : '🔈 Muto';
+    if (audioOn){ beep(740,.06,'triangle',.05); }
   });
 
   // Service worker
