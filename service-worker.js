@@ -1,4 +1,4 @@
-const CACHE = 'duoliftapp-v2';
+const CACHE = 'duoliftapp-v3';
 const ASSETS = [
   './',
   './index.html',

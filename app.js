@@ -34,15 +34,18 @@
     canvas.style.height = rect.height + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  new ResizeObserver(fit).observe(canvas.parentElement);
+  if (typeof ResizeObserver !== 'undefined') { new ResizeObserver(fit).observe(canvas.parentElement); } else { window.addEventListener('resize', fit); }
   window.addEventListener('orientationchange', () => setTimeout(fit, 300));
   fit();
 
   // WebAudio simple beeps
   let audioOn = true;
-  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  let ac = null;
+  function ensureAC(){
+    try{ if(!ac){ ac = new (window.AudioContext || window.webkitAudioContext)(); } if(ac.state==='suspended'){ ac.resume(); } }catch(e){ /* no audio */ }
+  }
   function beep(freq=660, dur=0.08, type='sine', vol=0.05){
-    if (!audioOn) return;
+    if (!audioOn) return; ensureAC(); if(!ac) return;
     const o = ac.createOscillator(); const g = ac.createGain();
     o.frequency.value = freq; o.type = type;
     g.gain.value = vol;
@@ -415,7 +418,7 @@
         camOn = true;
         btnCamera.setAttribute('aria-pressed','true');
       } catch (e){
-        toast('Permesso camera negato', 'err');
+        toast('Camera non disponibile', 'err');
       }
     } else {
       const s = video.srcObject;
@@ -470,7 +473,7 @@
     start();
   }
 
-  startBtn.addEventListener('click', openTheatreThenStart);
+  startBtn.addEventListener('click', ()=>{ try{ensureAC();}catch{}; openTheatreThenStart(); });
   btnReset.addEventListener('click', reset);
 
   // Timer
@@ -536,3 +539,5 @@
     });
   }
 })();
+// Guards if optional controls not present
+if (!document.querySelector('[data-theme]')) { /* optional theme buttons not in this layout */ }
