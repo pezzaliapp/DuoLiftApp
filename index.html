@@ -1,57 +1,52 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DuoLiftApp — CSS 3D (semplice & funzionante)</title>
-  <link rel="icon" sizes="192x192" href="icons/icon-192.png">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DuoLiftApp 3D — Ponte 2 Colonne</title>
+  <meta name="theme-color" content="#0b5fff"/>
+  <style>
+    :root{--bg:#0a0d14;--fg:#e5f0ff}
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    header{position:fixed;top:0;left:0;right:0;z-index:5;background:#0b5fff;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
+    #viewport{position:fixed;inset:56px 0 0 0}
+    #hud{position:fixed;right:12px;top:64px;z-index:6;display:grid;gap:8px}
+    .chip{background:#131b2e;border:1px solid rgba(255,255,255,.12);padding:8px 10px;border-radius:10px;font-size:12px}
+    #intro{position:fixed;inset:0;background:linear-gradient(180deg,#020409,#0a0d14);display:flex;align-items:center;justify-content:center;z-index:10}
+    .card{width:min(760px,92vw);border-radius:16px;background:#0e1628;color:#fff;box-shadow:0 20px 80px rgba(0,0,0,.45);padding:20px;border:1px solid rgba(255,255,255,.12)}
+    .btn{border:0;border-radius:10px;padding:8px 12px;background:#101828;color:#fff;cursor:pointer}
+  </style>
 </head>
 <body>
   <header>
-    <h1>🛠️ DuoLiftApp — CSS 3D</h1>
-    <div class="buttons">
-      <button id="reset">↺ Reset</button>
-      <button id="help">Guida</button>
-    </div>
+    <h1>🛠️ DuoLiftApp 3D</h1>
+    <button id="btnReset" class="btn">↺ Reset</button>
   </header>
 
-  <main>
-    <aside id="tray">
-      <h3>Pezzi</h3>
-      <div class="bin">
-        <!-- i pezzi vengono generati da JS -->
-      </div>
-      <div class="legend">
-        Trascina i pezzi sulla piattaforma, allinea alle sagome trasparenti. <b>Doppio click</b> per ruotare un pezzo.
-      </div>
-    </aside>
+  <div id="viewport"><canvas id="webgl"></canvas></div>
 
-    <section id="stageWrap">
-      <div id="iso">
-        <div id="floor">
-          <!-- ghost targets -->
-        </div>
-      </div>
-      <div id="hud">
-        <span>⏱️ <b id="time">00:00</b></span>
-        <span>🧩 <b id="placed">0</b>/<b id="total">0</b></span>
-        <span>⭐ <b id="score">0</b></span>
-      </div>
-    </section>
-  </main>
+  <div id="hud">
+    <div class="chip">⏱️ <span id="time">00:00</span></div>
+    <div class="chip">🧩 <span id="placed">0</span>/<span id="total">0</span></div>
+    <div class="chip">⭐ <span id="score">0</span></div>
+  </div>
 
-  <dialog id="guide">
-    <h2>DuoLiftApp — CSS 3D</h2>
-    <p>Versione senza librerie: usa <b>CSS 3D</b> con prospettiva isometrica. Drag & Snap su sagome.</p>
-    <ul>
-      <li>Trascina i pezzi nel piano.</li>
-      <li><b>Doppio click</b> per ruotarli di 15°.</li>
-      <li>Allinea alle sagome per farli “agganciare”.</li>
-    </ul>
-    <form method="dialog"><button>Ok</button></form>
-  </dialog>
+  <div id="intro">
+    <div class="card">
+      <h2>DuoLiftApp 3D</h2>
+      <p>Trascina i pezzi e agganciali alle sagome. Con un pezzo selezionato premi <b>Q/E</b> per ruotarlo.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="startBtn" class="btn">Inizia</button>
+      </div>
+    </div>
+  </div>
 
-  <script src="app.js"></script>
+  <!-- Three.js GLOBALI (nessun modulo) — usa jsDelivr che funziona bene con GitHub Pages -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/controls/OrbitControls.js"></script>
+
+  <!-- App -->
+  <script src="./app3d.js"></script>
 </body>
 </html>
